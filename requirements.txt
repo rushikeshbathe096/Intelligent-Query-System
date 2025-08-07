@@ -1,10 +1,10 @@
-%%writefile requirements.txt
 fastapi
 uvicorn
-python-dotenv
-requests
-PyMuPDF
+pyngrok
+python-multipart
 sentence-transformers
 faiss-cpu
-nltk
+pymupdf
 google-generativeai
+requests
+python-dotenv
