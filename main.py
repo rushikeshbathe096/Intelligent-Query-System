@@ -1,4 +1,3 @@
-%%writefile main.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
@@ -14,13 +13,19 @@ import textwrap
 import nltk
 from dotenv import load_dotenv
 
+# Initial setup
 nltk.download("punkt")
 from nltk.tokenize import sent_tokenize
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY not found in environment variables.")
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+genai.configure(api_key=GEMINI_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+
 app = FastAPI()
 
 class QueryRequest(BaseModel):
@@ -64,20 +69,20 @@ def chunk_text(text, chunk_size=300, overlap=50):
         chunks.append(chunk.strip())
 
     final_chunks = []
-    for i in range(0, len(chunks), 1):
+    for i in range(len(chunks)):
         start = max(0, i - 1)
         final_chunks.append(" ".join(chunks[start:i + 1]))
     return final_chunks
 
 def create_faiss_index(chunks):
-    embeddings = model.encode(chunks)
+    embeddings = embedder.encode(chunks)
     dim = embeddings.shape[1]
     index = faiss.IndexFlatL2(dim)
     index.add(np.array(embeddings))
     return index, embeddings, chunks
 
 def get_top_k_chunks(question, index, chunks, embeddings, k=5):
-    q_embedding = model.encode([question])
+    q_embedding = embedder.encode([question])
     D, I = index.search(np.array(q_embedding), k)
     return [chunks[i] for i in I[0]]
 
@@ -92,9 +97,11 @@ def generate_answer(context, question):
         Question:
         {question}
     """)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    try:
+        response = gemini_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"Error from Gemini API: {e}"
 
 @app.post("/query", response_model=QueryResponse)
 async def query_pdf(request: QueryRequest):
