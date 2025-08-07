@@ -1,0 +1,10 @@
+%%writefile requirements.txt
+fastapi
+uvicorn
+python-dotenv
+requests
+PyMuPDF
+sentence-transformers
+faiss-cpu
+nltk
+google-generativeai
